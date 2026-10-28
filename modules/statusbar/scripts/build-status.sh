@@ -43,14 +43,25 @@ cp scripts/mic-battery.sh "$BUNDLE/Contents/Resources/mic-battery.sh"
 chmod +x "$BUNDLE/Contents/Resources/mic-battery.sh"
 codesign --force --sign - --identifier com.lmf.djimicstatus "$BUNDLE" >/dev/null 2>&1 || true
 
-echo "[3/3] 安装到 ~/Applications"
-mkdir -p "$HOME/Applications"
-rm -rf "$HOME/Applications/$APP_NAME.app"
-cp -R "$BUNDLE" "$HOME/Applications/$APP_NAME.app"
+if [ "${1:-}" = "--build-only" ]; then
+  echo "构建完成：$BUNDLE"
+  exit 0
+fi
 
-# 移除旧的桌面悬浮版
-pkill -f DJIMicBattery 2>/dev/null || true
-rm -rf "$HOME/Applications/DJI Mic Battery.app"
+echo "[3/3] 安装到 ~/Applications（更新时保留原应用备份）"
+mkdir -p "$HOME/Applications"
+DEST="$HOME/Applications/$APP_NAME.app"
+if [ -e "$DEST" ] || [ -L "$DEST" ]; then
+  BACKUP="$DEST.backup-$(date +%Y%m%d-%H%M%S)-$$"
+  mv "$DEST" "$BACKUP"
+  echo "原应用已备份：$BACKUP"
+fi
+if ! cp -R "$BUNDLE" "$DEST"; then
+  echo "复制失败；如有备份，可在 Finder 中恢复：${BACKUP:-无旧应用}" >&2
+  exit 1
+fi
+
+# 保留旧悬浮版应用及其进程；由用户自行退出或在 Finder 中管理。
 
 echo
 echo "完成：$HOME/Applications/$APP_NAME.app"

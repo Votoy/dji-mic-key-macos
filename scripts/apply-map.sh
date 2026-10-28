@@ -13,7 +13,7 @@
 # 说明：hidutil 的映射是易失的，设备重新插拔或重启后需要重新应用。
 #       长期使用请加载 launchd/com.lmf.djimic-hidutil.plist。
 
-set -u
+set -eu
 VENDOR=11427
 PRODUCT=16401
 MATCH="{\"VendorID\":$VENDOR,\"ProductID\":$PRODUCT}"
@@ -26,8 +26,7 @@ case "${1:-}" in
     exit 0
     ;;
   --status)
-    hidutil property --matching "$MATCH" --get UserKeyMapping 2>&1
-    exit 0
+    exec /usr/bin/hidutil property --matching "$MATCH" --get UserKeyMapping
     ;;
 esac
 

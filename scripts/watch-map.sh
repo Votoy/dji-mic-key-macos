@@ -5,7 +5,7 @@
 #   launchd 对高频 StartInterval 有节流，实测 30 秒间隔会让拔插后要等半分钟。
 #   改成常驻进程自己 sleep，间隔完全可控，且单次 hidutil 仅约 11 ms。
 #
-# 由 com.lmf.djimic-hidutil.plist 以 KeepAlive 方式拉起。
+# 仅供手动调试；当前 LaunchAgent 使用 usbmapd，不使用本脚本。
 
 set -u
 VENDOR=11427

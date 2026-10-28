@@ -18,7 +18,18 @@ MODE="${1:-text}"
 SUPPORT="$HOME/Library/Application Support/DJIMicKey"
 VENV="$SUPPORT/venv"
 READER="$SUPPORT/dji-mic-mo.py"
-TMP=$(mktemp -t micbat)
+TMP=$(mktemp -t micbat) || exit 1
+PID=""
+cleanup() {
+    if [ -n "$PID" ]; then
+        kill "$PID" 2>/dev/null || true
+        wait "$PID" 2>/dev/null || true
+    fi
+    rm -f "$TMP" "${TMP}.reader"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # 进度信息一律走 stderr，保证 stdout 只有结果
 say() { echo "$@" >&2; }
@@ -35,9 +46,21 @@ fi
 # 2. 准备读取脚本（BSD-2-Clause，见 usokawa/dji-mic-mo）
 if [ ! -f "$READER" ]; then
     say "下载读取脚本…"
-    curl -fsSL -o "$READER" \
-        https://raw.githubusercontent.com/usokawa/dji-mic-mo/main/dji-mic-mo.py \
+    curl -fsSL --connect-timeout 10 --max-time 60 -o "${TMP}.reader" \
+        https://raw.githubusercontent.com/usokawa/dji-mic-mo/7c2dd5b0262f35b475193224fca2681d75987e9c/dji-mic-mo.py \
         || { say "下载失败，请检查网络"; exit 1; }
+    READER_SOURCE="${TMP}.reader"
+else
+    READER_SOURCE="$READER"
+fi
+EXPECTED_SHA256="df29abdf2344a880863f1f55ec61cbb8ca59302cecbdc4724258833d99a601d4"
+ACTUAL_SHA256=$(shasum -a 256 "$READER_SOURCE" | cut -d ' ' -f 1)
+if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+    say "读取脚本校验失败；已保留现有缓存，请检查第三方版本。"
+    exit 1
+fi
+if [ "$READER_SOURCE" != "$READER" ]; then
+    mv "$READER_SOURCE" "$READER" || exit 1
 fi
 
 # 3. 接收器在不在
@@ -47,17 +70,18 @@ if ! ioreg -r -c IOHIDDevice -l -w0 2>/dev/null | grep -q '"ProductID" = 16401';
 fi
 
 # 4. 采集状态：等电量字段出现，最多 12 秒；进程提前退出则立即结束
-pkill -f dji-mic-mo.py 2>/dev/null
-sleep 0.5
-"$VENV/bin/python3" "$READER" > "$TMP" 2>/dev/null &
+# 上游支持从 stdin 接收设备配置；禁用该输入，且只管理本次创建的子进程。
+# 上游仍可能设置 USB 配置、声明接口，不能视为绝对只读。
+"$VENV/bin/python3" "$READER" < /dev/null > "$TMP" 2>/dev/null &
 PID=$!
 for _ in $(seq 1 24); do
-    grep -q '"batteryLevel"' "$TMP" 2>/dev/null && break
+    grep -Eq '"batteryLevel"[[:space:]]*:[[:space:]]*[1-7]([,[:space:]]|$)' "$TMP" 2>/dev/null && break
     kill -0 $PID 2>/dev/null || break
     sleep 0.5
 done
 kill $PID 2>/dev/null
 wait $PID 2>/dev/null
+PID=""
 
 # 5. 取最近的、带电量字段的快照并解析
 "$VENV/bin/python3" - "$TMP" "$MODE" <<'PY'
@@ -82,8 +106,10 @@ while i < len(raw):
 
 snap = None
 for o in reversed(objs):
-    if any(isinstance(o.get(k), dict) and "batteryLevel" in o[k]
-           for k in ("tx1", "tx2", "tx")):
+    if isinstance(o, dict) and any(
+        isinstance(o.get(k), dict) and type(o[k].get("batteryLevel")) is int
+        and 1 <= o[k]["batteryLevel"] <= 7 for k in ("tx1", "tx2", "tx")
+    ):
         snap = o
         break
 
@@ -95,7 +121,8 @@ if snap is None:
 node = None
 for k in ("tx1", "tx2", "tx"):
     n = snap.get(k)
-    if isinstance(n, dict) and "batteryLevel" in n:
+    if (isinstance(n, dict) and type(n.get("batteryLevel")) is int
+            and 1 <= n["batteryLevel"] <= 7):
         node = n
         break
 

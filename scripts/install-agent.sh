@@ -4,7 +4,7 @@
 # 做的事：
 #   1. 编译并复制 usbmapd 到 ~/Library/Application Support/DJIMicKey/
 #   2. 用实际路径渲染 LaunchAgent 到 ~/Library/LaunchAgents/
-#   3. 加载并启动（事件驱动：平时 0% CPU，插拔时唤醒）
+#   3. 加载并启动（IOKit 设备通知 + 300 秒映射兜底）
 #
 # 卸载：./scripts/uninstall-agent.sh
 
@@ -20,18 +20,18 @@ BIN="$SUPPORT_DIR/usbmapd"
 
 mkdir -p "$SUPPORT_DIR" "$AGENT_DIR"
 
-# 没有二进制就先编译
-if [ ! -x "$ROOT/bin/usbmapd" ]; then
-  echo "编译 usbmapd…"
-  clang -O2 -Wall -o "$ROOT/bin/usbmapd" "$ROOT/src/usbmapd.c" \
-    -framework IOKit -framework CoreFoundation
-fi
+# 始终从当前源码编译，避免安装过期二进制。
+mkdir -p "$ROOT/bin"
+echo "编译 usbmapd…"
+clang -O2 -Wall -o "$ROOT/bin/usbmapd" "$ROOT/src/usbmapd.c" \
+  -framework IOKit -framework CoreFoundation
 
 cp "$ROOT/bin/usbmapd" "$BIN"
 cp "$ROOT/scripts/apply-map.sh" "$SUPPORT_DIR/apply-map.sh"
 chmod +x "$BIN" "$SUPPORT_DIR/apply-map.sh"
 
-sed "s|__BIN_PATH__|$BIN|" "$ROOT/launchd/$LABEL.plist" > "$PLIST"
+cp "$ROOT/launchd/$LABEL.plist" "$PLIST"
+plutil -replace ProgramArguments.0 -string "$BIN" "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true

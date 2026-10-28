@@ -1,6 +1,6 @@
 // statusbattery.swift — 状态栏电量图标
 //
-// 外观：状态栏 20×20 的绿色圆环（弧长 = 电量），中间是 DJI 字样
+// 外观：20×20 绿色圆环示意 7 档电量，非精确百分比；DJI 为字体文本，非官方 logo
 // 交互：点击展开菜单（电量、固件、序列号、输入电平、立即刷新、退出）
 // 数据：调用同目录 Resources/mic-battery.sh --json
 //
@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var battery: Battery?
     var lastError: String?
     var timer: Timer?
+    var refreshing = false
 
     let refreshInterval: TimeInterval = 300
 
@@ -171,6 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: 数据
 
     func refresh() {
+        guard !refreshing else { return }
         guard let script = Bundle.main.path(forResource: "mic-battery", ofType: "sh") else {
             lastError = "缺少读取脚本"
             rebuildMenu()
@@ -178,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        refreshing = true
         DispatchQueue.global(qos: .utility).async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -192,7 +195,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 process.waitUntilExit()
                 if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let level = obj["level"] as? Int {
+                   process.terminationStatus == 0,
+                   let level = obj["level"] as? Int, (1...7).contains(level) {
                     parsed = Battery(level: level,
                                      charging: obj["charging"] as? Bool ?? false,
                                      name: obj["name"] as? String ?? "DJI Mic",
@@ -205,6 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             DispatchQueue.main.async {
+                self.refreshing = false
                 self.battery = parsed
                 self.lastError = parsed == nil ? "读取失败，检查接收器是否插好" : nil
                 self.item.button?.image = self.makeIcon()

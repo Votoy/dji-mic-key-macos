@@ -1,102 +1,57 @@
 # 状态栏电量模块
 
-在 macOS 状态栏常驻一个 20×20 的图标：**绿色圆环 + DJI 字样**，圆环的弧长表示发射器电量，点击展开详情菜单。
+在 macOS 状态栏显示绿色圆环与系统字体绘制的 DJI 字样。该字样并非官方 logo，本模块不是 DJI 官方应用。
 
-```
-   ╭─────╮
-  ╱  DJI  ╲      ← 圆环 = 电量弧，中间是 DJI
-  ╲       ╱
-   ╰─────╯
-```
+电量来自接收器协议的 7 档状态：1 档最高、7 档最低。圆环按 `(8 - level) / 7` 映射成弧长，只表达相对档位，**不是精确电量百分比**。菜单中的“满电”“一半”等也是近似标签。
 
-## 特性
+## 构建与更新
 
-| 项 | 说明 |
-|---|---|
-| 图标 | 20×20，圆环线宽 2.0，中心 DJI 5.4pt Heavy |
-| 电量映射 | 1 档（满电）= 整圈，7 档（极低）= 1/7 圈 |
-| 数据来源 | 调用 `scripts/mic-battery.sh --json` |
-| 刷新 | 每 5 分钟一次，读取耗时 2–3 秒，期间保持上次状态 |
-| 深浅色 | DJI 字样用 `labelColor`，跟随系统外观自动重绘 |
-| Dock | 无（`LSUIElement`） |
-| 资源占用 | 常驻约 8 MB，空闲 0% CPU |
-
-菜单内容：
-
-```
-DJI Mic Mini 2 · 满电（1/7）
-输入电平 42
-固件 02.03.17.00
-──────────────
-立即刷新        ⌘R
-每 5 分钟自动刷新
-──────────────
-退出            ⌘Q
-```
-
-## 构建与安装
+需要 Xcode Command Line Tools（`swiftc`）。在仓库根目录执行：
 
 ```bash
-# 在仓库根目录执行
-./modules/statusbar/scripts/build-status.sh
+# 只构建，产物位于 bin/DJIMicStatus.app，不修改已安装应用
+./modules/statusbar/scripts/build-status.sh --build-only
 
+# 构建并安装；已有同名应用会移至带时间戳和进程号的备份路径
+./modules/statusbar/scripts/build-status.sh
 open "$HOME/Applications/DJI Mic Status.app"
 ```
 
-构建脚本会：
+更新前先从菜单退出旧状态栏应用。脚本保留旧应用备份；若复制失败，可在 Finder 检查目标并恢复备份。旧的桌面悬浮版不会被清理或终止，需自行管理。
 
-1. 用 `swiftc` 编译 `src/statusbattery.swift`（只需命令行工具，不需要 Xcode）
-2. 生成 `.app` 包，写入 `LSUIElement` 等 Info.plist 字段
-3. 把 `scripts/mic-battery.sh` 复制进 `Contents/Resources`（应用自包含）
-4. ad-hoc 签名，安装到 `~/Applications`
-5. 顺手清理旧的桌面悬浮版（如果有）
+应用由 [statusbattery.swift](src/statusbattery.swift) 编译，使用 `NSStatusItem` 绘图、`LSUIElement` 隐藏 Dock 图标，并做本地 ad-hoc 签名。打包脚本将仓库根目录的 [mic-battery.sh](../../scripts/mic-battery.sh) 复制进 Resources；Python、PyUSB、libusb 及运行时下载的读取器仍是外部依赖，并非完全自包含。
 
-## 开机自启
+## 使用与设备访问
 
-```bash
-./modules/statusbar/scripts/install-autostart.sh          # 安装
-./modules/statusbar/scripts/install-autostart.sh --remove # 移除
-```
+- 每 5 分钟刷新，可在菜单中立即刷新；同一应用进程内避免重叠采集。
+- 采集期间保留上次结果；失败后变灰。每次采集最多等待约 12 秒，另有退出开销；首次环境安装和下载可能更久。
+- 菜单显示设备名、电量档位、充电状态、输入电平及固件。读取器仅选取第一个含电量的发射器。
+- 中心字样采用 `labelColor`，随系统外观重绘。
+- 上游读取器支持设备参数写入及时间同步；本包装脚本断开 stdin 配置输入，但底层仍可能设置 USB 配置、声明接口或尝试分离驱动。不能保证绝对只读或无音频影响。
 
-安装后写入 `~/Library/LaunchAgents/com.lmf.djimicstatus.plist`，登录时自动拉起。注意这里用 `RunAtLoad` 而非 `KeepAlive`——你手动退出后不应该被系统重新拉起。
+依赖准备、缓存路径、隐私与许可证见 [主 README](../../README.md) 和 [第三方声明](../../THIRD_PARTY_NOTICES.md)。
 
-## 卸载
+## 自启与卸载
 
 ```bash
+./modules/statusbar/scripts/install-autostart.sh
 ./modules/statusbar/scripts/install-autostart.sh --remove
-rm -rf ~/Applications/"DJI Mic Status.app"
 ```
 
-## 调参
+自启写入 `~/Library/LaunchAgents/com.lmf.djimicstatus.plist`，使用 `RunAtLoad` 且不设置持续保活，手动退出后不会被反复拉起。标识为兼容既有安装保留。
 
-要改外观，直接改 `src/statusbattery.swift` 里 `makeIcon()` 的几个常量：
+卸载时先移除自启，再从状态栏菜单退出。在 Finder 的 `~/Applications` 中核对 `DJI Mic Status.app`，按需移到废纸篓；备份和旧悬浮应用也由用户核对后管理。支持目录可能由按键模块和电量模块共用，不自动清空。
 
-| 常量 | 当前值 | 作用 |
-|---|---|---|
-| `side` | 20 | 图标边长，可加到 22 让字更清楚 |
-| `radius` | 7.6 | 圆环半径 |
-| `width` | 2.0 | 圆环线宽，降到 1.5 可给字更多空间 |
-| 字号 | 5.4 | DJI 字样大小 |
-| `fraction` | `(8 - level) / 7` | 电量到弧长的映射，改这里可调整低电时的最小弧 |
+## 调参与排错
 
-改完重新执行 `build-status.sh` 即可。
+外观参数在 [makeIcon()](src/statusbattery.swift)：`side = 20`、`radius = 7.6`、`width = 2.0`、中心字号 `5.4`。刷新间隔为 `refreshInterval = 300` 秒，修改后重新构建安装。
 
-## 实现要点
+| 现象 | 检查 |
+|---|---|
+| 图标灰色 / 读取失败 | 接收器连接、发射器配对、Python 及 libusb 后端；在终端运行 `./scripts/mic-battery.sh` 查看错误 |
+| 图标不出现 | `open "$HOME/Applications/DJI Mic Status.app"`，确认运行的是更新后的应用 |
+| 电量长期不变 | 先立即刷新；7 档数据可能长时间保持同一档 |
+| 读取器校验失败 | 查看第三方声明中的固定版本；保留并检查已有缓存，不自动覆盖个人修改 |
+| DJI 字样太小 | 调整 `side` 和字号，再构建 |
 
-**为什么不用 WidgetKit**：系统小组件需要 Xcode 工程、App Extension 与签名，且时间线刷新有 5 分钟起步的硬限制。状态栏图标用 `NSStatusItem` + `NSImage(size:flipped:drawingHandler:)` 绘制，零依赖、可实时刷新。
-
-**为什么图标不是 template image**：`isTemplate = true` 会让系统把图标染成单色，绿色就没了。这里用 `isTemplate = false`，并让 DJI 字样取 `labelColor`，在深浅色菜单栏下都能读。
-
-**为什么取数要起子进程**：电量来自接收器的 USB 厂商自定义接口（DUML 协议），Swift 侧直接实现需要处理 libusb 与协议细节；复用已验证的 Python 读取器更稳，代价是每次 2–3 秒——对 5 分钟一次的刷新可以接受。
-
-**刷新期间不闪空白**：新数据回来之前保留旧值，只有解析失败时才把图标变灰。
-
-## 排错
-
-| 现象 | 原因 | 处理 |
-|---|---|---|
-| 图标变灰 | 接收器没插，或读取失败 | 检查接收器；菜单里点「立即刷新」 |
-| 菜单显示「未检测到接收器」 | 同上 | 同上 |
-| 图标不出现 | 应用未启动 | `open "$HOME/Applications/DJI Mic Status.app"` |
-| DJI 字样模糊 | 5.4pt 在 20×20 下偏小 | 把 `side` 调到 22、字号调到 6.0 |
-| 电量长期不变 | 刷新定时器被系统挂起 | 菜单点「立即刷新」确认；必要时重启应用 |
+读取日志可能包含设备序列号和设备名，分享前请脱敏。

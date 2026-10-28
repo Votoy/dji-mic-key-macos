@@ -17,7 +17,7 @@ fi
 
 echo "起始音量：$prev"
 echo "现在开始监听 ${DURATION} 秒 —— 请在此期间按一下发射器侧面的「连接/配对键」（短按一次）。"
-echo "如果音量变化，说明按键到达了系统；如果 30 秒内毫无变化，说明按键没有以音量键形式上报。"
+echo "请排除其他音量来源；无音量变化仅表示本次未观测到变化，不能排除 HID 或 BLE 事件。"
 echo
 
 end=$((SECONDS + DURATION))
@@ -34,7 +34,7 @@ done
 
 echo
 if [ $changes -eq 0 ]; then
-  echo "结果：${DURATION} 秒内音量未变化 —— 按键没有以音量键形式到达系统。"
+  echo "结果：${DURATION} 秒内未观测到音量变化（音量上限、输出设备或映射等也可能影响结果）。"
 else
   echo "结果：捕获到 ${changes} 次音量变化 —— 按键确实以音量键形式上报。"
 fi

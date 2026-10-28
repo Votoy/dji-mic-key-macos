@@ -13,7 +13,8 @@ hidutil property --matching '{"VendorID":11427,"ProductID":16401}' \
   --set '{"UserKeyMapping":[]}' >/dev/null 2>&1 || true
 
 rm -f "$PLIST"
-rm -rf "$SUPPORT_DIR"
+# 保留支持目录：其中还可能有电量模块环境、第三方脚本或用户文件。
+# 如需清理，请先在 Finder 中检查该目录。
 
 echo "已卸载自启，映射已清除。"
 echo "若接收器仍插着，音量键已恢复为原功能。"

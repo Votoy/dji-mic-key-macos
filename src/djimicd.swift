@@ -376,7 +376,10 @@ func printUsage() {
 }
 
 let argv = CommandLine.arguments
-if argv.count > 1 { cfg.command = argv[1] }
+if argv.count > 1 {
+    if argv[1] == "--help" || argv[1] == "-h" { printUsage(); exit(0) }
+    cfg.command = argv[1]
+}
 
 var i = 2
 while i < argv.count {
@@ -424,6 +427,10 @@ while i < argv.count {
         break
     }
     i += 1
+}
+
+guard cfg.matchOffset >= 0, cfg.matchOffset <= Int.max - (cfg.matchHex?.count ?? 0) else {
+    print("--offset 必须是非负且不会溢出的整数"); exit(1)
 }
 
 guard let spec = keyTable[cfg.keyName] else {

@@ -98,8 +98,9 @@ elif awk "BEGIN{exit !($MAXKB+0 > 0 || $MAXPPS+0 > 0)}"; then
   echo "结论 C：串口有数据但不是新帧型，需要进一步比对。"
   echo "        → 把 $LOG 发我。"
 else
-  echo "结论 D：按键在两条路上都没有产生任何信号。"
-  echo "        → 蓝牙直连这条路判定不可行，改用接收器或独立遥控器。"
+  echo "结论 D：本次测试未观察到系统音量变化或串口数据。"
+  echo "        → 仅覆盖当前连接状态和这两条通道，不能排除其他 BLE/GATT 或握手方案。"
+  echo "        → 已验证的替代方案是 USB 接收器映射。"
 fi
 
 echo

@@ -12,10 +12,10 @@
 //   ./bin/serialkeyd monitor                       # 只观察：每秒统计帧率，打印新出现的帧型
 //   ./bin/serialkeyd run --match "AA 14 00"        # 命中即触发
 //   ./bin/serialkeyd run --match "AA 14 00" --key f13 --debounce 500
-//   ./bin/serialkeyd monitor --port /dev/cu.DJIMicMini2-C8701B
+//   ./bin/serialkeyd monitor --port /dev/cu.DJIMicMini2-XXXXXX
 //
-// 判读：monitor 模式下按下发射器连接键，若在按键瞬间出现一行 [NEW SIG]，
-//       就说明按键事件混在这条流里，把该帧的前几个字节填进 --match 即可。
+// 判读：按键瞬间出现 [NEW SIG] 仅是候选线索，需重复按键与空闲对照，
+//       确认关联并排除普通状态帧后，才能尝试 --match。
 
 import Foundation
 import CoreGraphics
@@ -244,7 +244,10 @@ final class Watcher {
         while true {
             guard let start = find(sync, from: cursor) else { break }
             // 下一帧起点
-            let next = find(sync, from: start + sync.count) ?? buffer.count
+            guard let next = find(sync, from: start + sync.count) else {
+                cursor = start
+                break
+            }
             let frameLen = next - start
             let sig = signature(at: start, length: frameLen)
             packetsWindow += 1
@@ -328,7 +331,10 @@ func printUsage() {
 }
 
 let argv = CommandLine.arguments
-if argv.count > 1 { cfg.command = argv[1] }
+if argv.count > 1 {
+    if argv[1] == "--help" || argv[1] == "-h" { printUsage(); exit(0) }
+    cfg.command = argv[1]
+}
 var i = 2
 while i < argv.count {
     switch argv[i] {

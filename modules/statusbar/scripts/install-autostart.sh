@@ -26,7 +26,8 @@ if [ ! -x "$BIN" ]; then
 fi
 
 mkdir -p "$HOME/Library/LaunchAgents"
-sed "s|__APP_PATH__|$BIN|" "$ROOT/modules/statusbar/launchd/$LABEL.plist" > "$PLIST"
+cp "$ROOT/modules/statusbar/launchd/$LABEL.plist" "$PLIST"
+plutil -replace ProgramArguments.0 -string "$BIN" "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true

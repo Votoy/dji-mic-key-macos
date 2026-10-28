@@ -2,8 +2,8 @@
 //
 // 与 watch-map.sh 的区别：
 //   watch-map.sh  常驻 + 每秒轮询，每秒唤醒一次 CPU
-//   usbmapd       注册 IOKit 匹配通知，平时在 CFRunLoop 里完全阻塞（0% CPU），
-//                 只在接收器插入 / 系统唤醒后设备重新枚举时才被唤醒一次
+//   usbmapd       通过 IOKit 匹配通知应用映射，另有 300 秒定时兜底。
+//                 RunLoop 最长每秒返回一次检查退出信号，并非零唤醒。
 //
 // 编译：
 //   clang -O2 -Wall -o ../bin/usbmapd usbmapd.c -framework IOKit -framework CoreFoundation
@@ -155,32 +155,22 @@ int main(int argc, char **argv) {
     // 若接收器已经插着，这一步会立刻写一次映射。
     device_matched(NULL, iterator);
 
-    CFRunLoopTimerRef timer = NULL;
-    if (selftest_seconds > 0) {
-        CFRunLoopTimerContext ctx = {0, NULL, NULL, NULL, NULL};
-        timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
-                                     CFAbsoluteTimeGetCurrent() + selftest_seconds,
-                                     0, 0, 0, safety_timer, &ctx);
-        CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, kCFRunLoopDefaultMode);
-    } else {
-        CFRunLoopTimerContext ctx = {0, NULL, NULL, NULL, NULL};
-        timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
-                                     CFAbsoluteTimeGetCurrent() + 300.0,
-                                     300.0, 0, 0, safety_timer, &ctx);
-        CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, kCFRunLoopDefaultMode);
-    }
+    CFRunLoopTimerContext ctx = {0, NULL, NULL, NULL, NULL};
+    CFRunLoopTimerRef timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
+                                 CFAbsoluteTimeGetCurrent() + 300.0,
+                                 300.0, 0, 0, safety_timer, &ctx);
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, kCFRunLoopDefaultMode);
+    CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + selftest_seconds;
 
     if (!g_quiet) fprintf(stderr, "usbmapd ready (event-driven)\n");
 
     while (!g_stop) {
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, true);
-        if (selftest_seconds > 0) {
-            static int elapsed = 0;
-            elapsed++;
-            if (elapsed >= selftest_seconds) break;
-        }
+        if (selftest_seconds > 0 && CFAbsoluteTimeGetCurrent() >= deadline) break;
     }
 
+    CFRunLoopTimerInvalidate(timer);
+    CFRelease(timer);
     CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, kCFRunLoopDefaultMode);
     IOObjectRelease(iterator);
     IONotificationPortDestroy(notify_port);
