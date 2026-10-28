@@ -520,7 +520,9 @@ echo "  bin/DJIMicKey.app"
 
 | 文件 | 用途 |
 |---|---|
-| `scripts/mic-battery.sh` | 读取发射器电量（7 档）、充电状态与输入电平 |
+| `scripts/mic-battery.sh` | 读取发射器电量（7 档）、充电状态与输入电平，支持 `--json` |
+| `src/batterywidget.swift` | 桌面悬浮电量小组件（AppKit，无需 Xcode） |
+| `scripts/build-widget.sh` | 编译并安装小组件到 `~/Applications` |
 | `scripts/watch-map.sh` | 轮询版守护（每秒一次），调试用，日常不需要 |
 | `scripts/press-test.sh` | 一次性判定「按键有没有产生信号」（音量 + 蓝牙串口双通道） |
 | `scripts/volwatch.sh` | 只监听系统音量变化，判断按键是否被当成音量键 |
@@ -673,6 +675,24 @@ macOS 系统层不提供麦克风电量——IO 注册表里没有电池字段�
 | 本脚本 | 7 档 | Mac 上直接读，无需拔插 |
 | DJI Mimo（手机） | 百分比 | 需把接收器插到手机，或让发射器蓝牙直连手机 |
 | 接收器指示灯 | 两档 | 发射器状态灯：红 = 电量 0–10%，绿 = 高于 10% |
+
+### 9.1 桌面悬浮小组件
+
+系统级 WidgetKit 小组件需要 Xcode 工程、App Extension 与签名，且刷新频率受系统限制，因此这里用 AppKit 做了一个**同外观的桌面悬浮窗**：圆角半透明面板、7 段环形电量、可拖动、右键菜单。
+
+```bash
+./scripts/build-widget.sh          # 编译并安装到 ~/Applications
+open "$HOME/Applications/DJI Mic Battery.app"
+```
+
+说明：
+
+- 默认出现在屏幕右上角，拖动后位置会被记住
+- 每 5 分钟自动刷新，右键可「立即刷新」或「退出」
+- 无 Dock 图标（`LSUIElement`），不抢焦点（`nonactivatingPanel`）
+- 电量用 7 段环形表示：全亮 = 满电，全暗 = 极低；颜色随档位变绿/黄/红
+- 刷新时读取约 2–3 秒，期间保留上一次的数值，不会闪成空白
+- 卸载：`rm -rf ~/Applications/"DJI Mic Battery.app"`
 
 ---
 
