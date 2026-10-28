@@ -1,0 +1,10 @@
+# 编译产物
+bin/
+*.app
+*.o
+
+# macOS
+.DS_Store
+
+# 日志
+*.log

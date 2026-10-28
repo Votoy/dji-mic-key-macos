@@ -1,0 +1,38 @@
+{
+  "title": "DJI Mic 接收器音量键 → 右 Command",
+  "rules": [
+    {
+      "description": "DJI 接收器连接键（音量+）→ 右 Command",
+      "manipulators": [
+        {
+          "type": "basic",
+          "from": {
+            "consumer_key_code": "volume_increment",
+            "modifiers": { "optional": ["any"] }
+          },
+          "to": [{ "key_code": "right_command" }],
+          "conditions": [
+            {
+              "type": "device_if",
+              "identifiers": [{ "vendor_id": 11427, "product_id": 16401 }]
+            }
+          ]
+        },
+        {
+          "type": "basic",
+          "from": {
+            "consumer_key_code": "volume_decrement",
+            "modifiers": { "optional": ["any"] }
+          },
+          "to": [{ "key_code": "right_command" }],
+          "conditions": [
+            {
+              "type": "device_if",
+              "identifiers": [{ "vendor_id": 11427, "product_id": 16401 }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
