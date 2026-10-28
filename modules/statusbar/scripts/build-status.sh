@@ -5,17 +5,19 @@
 # 依赖：swiftc（命令行工具即可），不需要 Xcode
 
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# 仓库根目录（本脚本位于 modules/statusbar/scripts/）
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$ROOT"
 
 APP_NAME="DJI Mic Status"
-BUNDLE="bin/DJIMicStatus.app"
+BUNDLE="$ROOT/bin/DJIMicStatus.app"
 
 rm -rf "$BUNDLE"
 mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 
 echo "[1/3] 编译"
-swiftc -O -o "$BUNDLE/Contents/MacOS/DJIMicStatus" src/statusbattery.swift \
-  -framework AppKit
+swiftc -O -o "$BUNDLE/Contents/MacOS/DJIMicStatus" \
+  "$ROOT/modules/statusbar/src/statusbattery.swift" -framework AppKit
 
 echo "[2/3] 打包"
 cat > "$BUNDLE/Contents/Info.plist" <<'PLIST'

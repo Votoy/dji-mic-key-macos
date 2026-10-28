@@ -521,8 +521,7 @@ echo "  bin/DJIMicKey.app"
 | 文件 | 用途 |
 |---|---|
 | `scripts/mic-battery.sh` | 读取发射器电量（7 档）、充电状态与输入电平，支持 `--json` |
-| `src/statusbattery.swift` | 状态栏电量图标（绿色圆环 + DJI 字样，AppKit，无需 Xcode） |
-| `scripts/build-status.sh` | 编译并安装状态栏应用到 `~/Applications` |
+| `modules/statusbar/` | **状态栏电量模块**（独立文档见 `modules/statusbar/README.md`） |
 | `scripts/watch-map.sh` | 轮询版守护（每秒一次），调试用，日常不需要 |
 | `scripts/press-test.sh` | 一次性判定「按键有没有产生信号」（音量 + 蓝牙串口双通道） |
 | `scripts/volwatch.sh` | 只监听系统音量变化，判断按键是否被当成音量键 |
@@ -681,7 +680,7 @@ macOS 系统层不提供麦克风电量——IO 注册表里没有电池字段�
 系统级 WidgetKit 小组件需要 Xcode 工程、App Extension 与签名，因此这里改为状态栏图标：20×20 的绿色圆环，弧长表示电量，中间是 DJI 字样。
 
 ```bash
-./scripts/build-status.sh
+./modules/statusbar/scripts/build-status.sh
 open "$HOME/Applications/DJI Mic Status.app"
 ```
 
@@ -692,7 +691,10 @@ open "$HOME/Applications/DJI Mic Status.app"
 - 点击图标展开菜单：电量档位、充电状态、输入电平、固件、立即刷新、退出
 - 每 5 分钟自动刷新，读取耗时约 2–3 秒，期间图标保持上一次的状态
 - 无 Dock 图标（`LSUIElement`）
+- 开机自启：`./modules/statusbar/scripts/install-autostart.sh`
 - 卸载：`rm -rf ~/Applications/"DJI Mic Status.app"`
+
+> 模块的完整文档（调参、排错、实现要点）见 [`modules/statusbar/README.md`](modules/statusbar/README.md)。
 
 ---
 
